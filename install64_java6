@@ -1,0 +1,12 @@
+#!/bin/sh
+apt-get update -y 
+apt-get install -y wget make gcc g++ nano locate curl
+apt-get update -y 
+apt-get install -y wget make gcc g++ nano locate curl
+cd /opt/
+wget --no-check-certificate --no-cookies --header "Cookie: gpw_e24=xxx;" http://download.oracle.com/otn-pub/java/jdk/6u34-b04/jdk-6u34-linux-x64.bin
+./jdk-6u34-linux-x64.bin
+ln -sf /opt/jdk1.6.0_34/bin/java /usr/bin/java
+ln -sf /opt/jdk1.6.0_34/bin/javac /usr/bin/javac
+ln -sf /opt/jdk1.6.0_34/bin/javaws /usr/bin/javaws
+echo "JAVA_HOME=\"/opt/jdk1.6.0_34\"" >> /etc/environment

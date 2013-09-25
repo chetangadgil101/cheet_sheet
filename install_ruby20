@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -e
+sudo apt-get update
+sudo apt-get build-dep ruby1.9.1
+
+wget -c http://ftp.ruby-lang.org/pub/ruby/2.0/ruby-2.0.0-p0.tar.gz
+tar xzf ruby-2.0.0-p0.tar.gz
+cd ruby-2.0.0-p0
+
+./configure
+make
+rm /usr/bin/ruby
+ln -s /home/kid/ruby-2.0.0-p0/ruby /usr/bin/ruby
+
+sudo checkinstall -y \
+  --pkgversion 2.0.0-p0 \
+  --provides "ruby-interpreter" \
+
+

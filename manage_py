@@ -1,0 +1,238 @@
+#!/bin/bash
+
+# django start function
+py_prj_start(){
+        node node_modules/forever/bin/forever start -l forever.log -o out.log -e err.log -a /var/www/nodeapps/$(grep '.js' /var/www/nodeapps/app.yml | awk '{print$3}')
+}
+
+nodestart2() {
+        if [ $(ps -ef | grep -w 'nodejs' | sed -e '1,3!d' | wc -l) = 1 ]; then
+                node node_modules/forever/bin/forever start -l forever.log -o out.log -e err.log -a /var/www/nodeapps/$(grep '.js' /var/www/nodeapps/app.yml | awk '{print$3}')
+                sleep 0.5
+                if [ $(du -k err.log | cut -f1) = 0 ]; then
+                        #echo "started without error"
+                        sleep 1
+                        netstat -tulan | grep 8080
+                        #sleep 1
+                        if [ $? -eq 0 ]; then
+                                #sleep 0.02
+                                echo "app started on port 8080"
+                                #echo $(netstat -tulan | grep 8080)
+                                #exit 1
+                        else
+                                #sleep 0.02
+                                echo "=== =app not started on port 8080"
+                                #echo $(netstat -tulan | grep 8080)
+                                node node_modules/forever/bin/forever stopall
+                                cat /dev/null > err.log
+                                #echo "---app not started on port 8080"
+                        fi
+                else
+                        echo "=== == started with an error"
+                        #node node_modules/forever/bin/forever stopall
+                        #cat /dev/null > err.log
+
+                fi
+        else
+                echo  $(ps -ef | grep -w 'node' | sed -e '1,3!d' | wc -l)
+                echo "=== == already app is running"
+
+        fi
+
+}
+# nodejs stop function
+py_prj_stop() {
+        cat /dev/null > err.log
+        node node_modules/forever/bin/forever stopall
+}
+
+case $1 in
+
+# webserver start case
+start)
+        if [ $(ps -ef | grep -w 'nodejs' | sed -e '1,3!d' | wc -l) = 1 ]; then
+                nodestart
+                if [ $? -eq 0 ]; then
+
+                sleep 0.5
+                if [ $(du -k err.log | cut -f1) = 0 ]; then
+                        #echo "started without error"
+                        sleep 0.5
+                        netstat -tulan | grep 8080
+                        #sleep 1
+                        if [ $? -eq 0 ]; then
+                                #sleep 0.02
+                                echo "app started on port 8080"
+                                echo '{"code":2000,"success":"true", "message":"Nodejs started"}'
+                                #echo $(netstat -tulan | grep 8080)
+                                #exit 1
+                        else
+                                #sleep 0.02
+                                echo "app not started on port 8080"
+                                echo '{"success":"false","code":1201, "message":"Nodejs not started"}'
+                                #echo $(netstat -tulan | grep 8080)
+                                node node_modules/forever/bin/forever stopall
+                                cat /dev/null > err.log
+                        fi
+                else
+                        echo "started with an error"
+                        echo '{"success":"false","code":1201, "message":"Nodejs not started"}'
+                        #node node_modules/forever/bin/forever stopall
+                        #cat /dev/null > err.log
+
+                fi
+                else
+                        echo '{"success":"false","code":1201, "message":"Nodejs not started"}'
+                fi
+        else
+                echo  $(ps -ef | grep -w 'node' | sed -e '1,3!d' | wc -l)
+                echo "already app is running"
+                echo '{"success":"false","code":1201, "message":"Nodejs not started"}'
+
+        fi
+        #echo "----- "$(nodestart)
+        #if [ $(nodestart) -eq "warn: --minUptime not set." ];
+        #if [ $? -eq 0 ]; then
+        #       echo '{"code":2000,"success":"true", "message":"Nodejs started"}'
+        #else
+        #       echo '{"success":"false","code":1201, "message":"Nodejs not started"}'
+        #fi
+;;
+
+# webserver stop case
+stop)
+        nodestop
+        nodepids=`ps aux | grep " node " | grep -v grep | cut -c10-15`
+        echo $nodepids
+        if [ $? -eq 0 ]; then
+                echo '{"code":2000,"success":"true", "message":"Nodejs stopped"}'
+        else
+                echo '{"success":"false","code":1202, "message":"Nodejs not stopped"}'
+        fi;;
+
+# deploy and update application
+deploy)
+        # download application
+        wget --no-check-certificate --directory-prefix=$HOME/download $2
+        if [ $? -eq 0 ]; then
+                echo "wget executed"
+                nodestop
+                echo "nodejs stopped"
+                if [ $? -eq 0 ]; then
+                        # backup existing application
+                        rm -rf  $HOME/backup/*
+                        if [ ! -d /var/www/nodeapps ]; then
+                        mkdir /var/www/nodeapps
+                        fi
+                        mv /var/www/nodeapps/  $HOME/backup/
+                        #echo "nodejs stopped dir exist"
+                        if [ $? -eq 0 ]; then
+                                # get download file name
+                                fileWithExt=${2##*/}
+                                FileExt=${fileWithExt#*.}
+                                d=`echo "$fileWithExt" | cut -d'.' -f1`
+                                #echo $d
+
+                                # extract source
+                                case $FileExt in
+
+                                        # extract tar.gz format
+                                        tar.gz)
+                                                tar xvzf $HOME/download/$fileWithExt -C $HOME/download/ > $HOME/fname
+                                                d=`head -1 $HOME/fname|cut -d'/' -f1`
+                                                echo "fname=$d"
+                                        ;;
+
+                                        # extract gzip format
+                                        gz)
+                                                gunzip $HOME/download/$fileWithExt ;;
+
+                                        # extract zip format
+                                        zip)
+                                                unzip $HOME/download/$fileWithExt -d $HOME/download/ > $HOME/fname
+                                                d=`head -2 $HOME/fname | tail -1 |rev|cut -d'/' -f2|rev`
+                                                echo "fname=$d"
+                                        ;;
+                                esac
+                                #echo "tar executed"
+                                # move source to nodeapps folder
+                                #rm -rf /var/www/nodeapps/*
+                                #sleep 1
+                                if [ ! -d $HOME/download ]; then
+                                        mkdir $HOME/download
+                                fi
+                                #if [ ! -d $d ]; then
+
+                                fi
+                                mv $HOME/download/$d /var/www/nodeapps
+                                echo "tar moved"
+
+                                if [ $? -eq 0 ]; then
+                                        node node_modules/forever/bin/forever start -l forever.log -o out.log -e err.log -a /var/www/nodeapps/$(grep '.js' /var/www/nodeapps/app.yml | awk '{print$3}')
+                                        sleep 0.5
+                                        if [ $(du -k err.log | cut -f1) = 0 ]; then
+                                                sleep 1
+                                                netstat -tulan | grep 0.0.0.0:8080
+                                        if [ $? -eq 0 ]; then
+                                                echo "app started on port 8080"
+                                        if [ $? -eq 0 ]; then
+                                                # remove downloaded and backup file
+                                                rm -rf $HOME/backup/nodeapps/*
+                                                rm -rf $HOME/download/*
+                                                echo '{"code":2000,"success":"true", "message":"App deployed and Nodejs started"}'
+
+#############################################
+                                        ######### ------------######################
+
+                                        else
+                                                echo '{"success":"false","code":1203, "message":"App deployed but webserver not started"}'
+                                                exit 1
+                                        fi
+                                        else
+                                                echo "app not started on port 8080"
+                                                node node_modules/forever/bin/forever stopall
+                                                echo '{"success":"false","code":1203, "message":"App deployed but webserver not started"}'
+                                                exit 1
+                                        fi
+                                        else
+                                                echo "started with an error"
+                                                echo '{"success":"false","code":1203, "message":"App deployed but webserver not started"}'
+                                                exit 1
+                                        fi
+
+                                else
+                                        # remove apps contents, coping app data from backup, start webserver & remove downloaded and backup file
+                                        rm -rf /var/www/*
+                                        mv  $HOME/backup/nodeapps /var/www/nodeapps
+                                        nodestart
+                                        rm -rf $HOME/backup/nodeapps/*
+                                        rm -rf $HOME/download/*
+                                        echo '{"success":"false","code":1204, "message":"App deployment failed, please try again"}'
+                                        exit 1
+                                fi
+
+                        else
+                                nodestart
+                                # remove downloaded file
+                                rm -rf $HOME/download
+                                echo '{"success":"false","code":1205, "message":"Www folder content not removed"}'
+                                exit 1
+                        fi
+                else
+                        nodestart
+                        # remove downloaded file
+                        rm -rf $HOME/download
+                        echo '{"success":"false","code":1202, "message":"Nodejs not stopped"}'
+                        exit 1
+                fi
+        #else
+
+                # remove downloaded file
+                rm -rf $HOME/download
+                echo '{"success":"false","code":1206, "message":"App download failed, please try again"}'
+                exit 1
+        #fi
+	;;
+
+esac
+
